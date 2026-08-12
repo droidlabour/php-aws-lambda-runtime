@@ -1,0 +1,25 @@
+# After copying this directory into your Laravel app's repo root as
+# `aws-lambda/` (see ./README.md), move this file up to the repo root,
+# next to composer.json. The build context below is `.` (the repo root) -
+# aws-lambda/Dockerfile's `COPY . .` step needs the whole app alongside
+# composer.json.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: aws-lambda/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "9000:8080"
+
+  worker:
+    build:
+      context: .
+      dockerfile: aws-lambda/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "9001:8080"
+    command: ["queue.handler"]

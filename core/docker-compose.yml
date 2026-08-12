@@ -1,0 +1,7 @@
+services:
+  runtime:
+    build:
+      context: .
+    container_name: php-aws-lambda-runtime
+    ports:
+      - 9000:8080

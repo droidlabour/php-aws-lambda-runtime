@@ -1,0 +1,43 @@
+#!/usr/bin/env php
+<?php
+
+[$handlerFile, $handlerFunction] = explode('.', getenv('_HANDLER'), 2);
+require getenv('LAMBDA_TASK_ROOT') . '/' . $handlerFile . '.php';
+
+$runtimeApi = getenv('AWS_LAMBDA_RUNTIME_API');
+
+while (true) {
+    $ch = curl_init("http://{$runtimeApi}/2018-06-01/runtime/invocation/next");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true);
+    $response = curl_exec($ch);
+    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    curl_close($ch);
+
+    $headers = substr($response, 0, $headerSize);
+    $body = substr($response, $headerSize);
+
+    preg_match('/^Lambda-Runtime-Aws-Request-Id:\s*(.*)$/mi', $headers, $matches);
+    $requestId = trim($matches[1]);
+
+    try {
+        $result = call_user_func($handlerFunction, json_decode($body, true));
+
+        $ch = curl_init("http://{$runtimeApi}/2018-06-01/runtime/invocation/{$requestId}/response");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($result));
+        curl_exec($ch);
+        curl_close($ch);
+    } catch (\Throwable $e) {
+        $errorBody = json_encode([
+            'errorMessage' => $e->getMessage(),
+            'errorType' => get_class($e),
+        ]);
+
+        $ch = curl_init("http://{$runtimeApi}/2018-06-01/runtime/invocation/{$requestId}/error");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $errorBody);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+}
