@@ -7,12 +7,18 @@
 
 FROM public.ecr.aws/lambda/provided:al2023 AS mongodb-builder
 
+# AL2023 currently packages PHP 8.1 through 8.5 - override at build time
+# with `--build-arg PHP_VERSION=8.3` (or any other version it ships) to
+# pin a different one. See the main README's "Choosing a PHP version"
+# section.
+ARG PHP_VERSION=8.5
+
 # ext-mongodb isn't packaged by AL2023, so compile it from PECL source.
 # Swap the version / drop this stage entirely if your app doesn't need it.
 RUN dnf install -y \
-    php8.3 \
-    php8.3-cli \
-    php8.3-devel \
+    php${PHP_VERSION} \
+    php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-devel \
     gcc \
     gcc-c++ \
     make \
@@ -33,19 +39,21 @@ RUN curl -sSL -o /tmp/mongodb.tgz https://pecl.php.net/get/mongodb-1.21.0.tgz \
 
 FROM public.ecr.aws/lambda/provided:al2023 AS composer-builder
 
+ARG PHP_VERSION=8.5
+
 RUN dnf install -y \
-    php8.3 \
-    php8.3-cli \
-    php8.3-mbstring \
-    php8.3-gd \
-    php8.3-xml \
-    php8.3-process \
-    php8.3-pdo \
+    php${PHP_VERSION} \
+    php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-mbstring \
+    php${PHP_VERSION}-gd \
+    php${PHP_VERSION}-xml \
+    php${PHP_VERSION}-process \
+    php${PHP_VERSION}-pdo \
     git \
     unzip \
     --setopt=install_weak_deps=0
 
-COPY --from=mongodb-builder /usr/lib64/php8.3/modules/mongodb.so /usr/lib64/php8.3/modules/mongodb.so
+COPY --from=mongodb-builder /usr/lib64/php${PHP_VERSION}/modules/mongodb.so /usr/lib64/php${PHP_VERSION}/modules/mongodb.so
 RUN echo "extension=mongodb" > /etc/php.d/30-mongodb.ini
 
 COPY --link --from=composer/composer:2-bin /composer /usr/bin/composer
@@ -62,25 +70,28 @@ RUN composer install \
 
 FROM public.ecr.aws/lambda/provided:al2023
 
+ARG PHP_VERSION=8.5
+
 ENV TZ=UTC
 
 # Match the extensions to whatever your app's composer.json actually
-# requires - php8.3-pdo is included here because mongodb/laravel-mongodb's
-# Connection class extends Laravel core's Illuminate\Database\Connection,
-# which references the PDO class in its own signatures, so it's needed
-# even though this app never touches a relational database.
+# requires - php${PHP_VERSION}-pdo is included here because
+# mongodb/laravel-mongodb's Connection class extends Laravel core's
+# Illuminate\Database\Connection, which references the PDO class in its
+# own signatures, so it's needed even though this app never touches a
+# relational database.
 RUN dnf install -y \
-    php8.3 \
-    php8.3-cli \
-    php8.3-mbstring \
-    php8.3-gd \
-    php8.3-xml \
-    php8.3-process \
-    php8.3-pdo \
+    php${PHP_VERSION} \
+    php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-mbstring \
+    php${PHP_VERSION}-gd \
+    php${PHP_VERSION}-xml \
+    php${PHP_VERSION}-process \
+    php${PHP_VERSION}-pdo \
     --setopt=install_weak_deps=0 \
     && dnf clean all
 
-COPY --from=mongodb-builder /usr/lib64/php8.3/modules/mongodb.so /usr/lib64/php8.3/modules/mongodb.so
+COPY --from=mongodb-builder /usr/lib64/php${PHP_VERSION}/modules/mongodb.so /usr/lib64/php${PHP_VERSION}/modules/mongodb.so
 RUN echo "extension=mongodb" > /etc/php.d/30-mongodb.ini
 
 WORKDIR /var/task

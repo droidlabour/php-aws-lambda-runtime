@@ -7,13 +7,19 @@
 
 FROM public.ecr.aws/lambda/provided:al2023
 
+# AL2023 currently packages PHP 8.1 through 8.5 - override at build time
+# with `--build-arg PHP_VERSION=8.3` (or any other version it ships) to
+# pin a different one. See the main README's "Choosing a PHP version"
+# section.
+ARG PHP_VERSION=8.5
+
 # Install PHP itself here, plus whatever extensions your app needs that
-# are packaged by AL2023 (e.g. php8.3-mbstring, php8.3-gd, php8.3-pdo).
+# are packaged by AL2023 (e.g. php${PHP_VERSION}-mbstring, -gd, -pdo).
 # Anything not packaged (like ext-mongodb) needs compiling from PECL
 # source - see the Laravel/MongoDB example for that pattern.
 RUN dnf install -y \
-    php8.3 \
-    php8.3-cli \
+    php${PHP_VERSION} \
+    php${PHP_VERSION}-cli \
     --setopt=install_weak_deps=0 \
     && dnf clean all
 

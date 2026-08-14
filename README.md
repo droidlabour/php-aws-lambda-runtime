@@ -12,7 +12,7 @@ an extension it doesn't ship a prebuilt layer for, or a version it doesn't
 support yet — then you're stuck vendoring custom layers, pinning to
 whatever version the maintainer got around to building, or fighting a
 build pipeline you don't control. AL2023's own package repo already ships
-PHP 8.3 with most common extensions (`mbstring`, `gd`, `xml`, `pdo`, ...),
+PHP 8.1 through 8.5 with most common extensions (`mbstring`, `gd`, `xml`, `pdo`, ...),
 and anything it doesn't ship (like `ext-mongodb` here) compiles from PECL
 source in a few lines. Once you've seen that, the "runtime" part of a
 custom Lambda runtime turns out to be small enough to just own outright.
@@ -110,8 +110,10 @@ through the actual middleware stack, and SQS-triggered queue jobs — see
 
 ## Default PHP modules
 
-Installing `php8.3` + `php8.3-cli` from the AL2023 package repo (as
-`core/Dockerfile` does) pulls in the following modules by default:
+Installing `php<version>` + `php<version>-cli` from the AL2023 package
+repo (as both Dockerfiles do) pulls in roughly the following modules by
+default — captured against PHP 8.3, so treat it as a baseline rather than
+an exact list for every version:
 
 ```
 bz2, calendar, Core, ctype, curl, date, dom, exif, fileinfo, filter, ftp,
@@ -122,9 +124,42 @@ xsl, zlib
 ```
 
 Anything beyond this list (`mbstring`, `gd`, `pdo`, ...) needs an explicit
-`dnf install php8.3-<extension>` line, or — if it isn't packaged for
+`dnf install php<version>-<extension>` line, or — if it isn't packaged for
 AL2023 at all (like `ext-mongodb`) — compiling from PECL source, as shown
 in the Laravel example.
+
+## Choosing a PHP version
+
+Both `core/Dockerfile` and `examples/laravel-mongodb/Dockerfile` default
+to PHP 8.5, but take a `PHP_VERSION` build arg so you can pin any version
+AL2023 currently packages (8.1 through 8.5 as of this writing — AWS adds
+new ones over time; check the
+[AL2023 PHP docs](https://docs.aws.amazon.com/linux/al2023/ug/php.html)
+for the current list) — no fork or edit required, just override the arg:
+
+```
+docker build --build-arg PHP_VERSION=8.3 -t my-runtime core/
+```
+
+Or in `docker-compose.yml`:
+
+```yaml
+services:
+  runtime:
+    build:
+      context: .
+      args:
+        PHP_VERSION: "8.3"
+```
+
+This works because every `dnf install` line in both Dockerfiles installs
+`php${PHP_VERSION}` and its `-cli`/`-mbstring`/etc. siblings rather than a
+hardcoded version — the Laravel example's compiled `ext-mongodb` module
+path (`/usr/lib64/php${PHP_VERSION}/modules/mongodb.so`) is templated the
+same way, so switching versions doesn't leave a stage still building
+against the old one. AL2023 only packages one PHP release per major.minor
+(no patch-level pinning) — for that level of control you'd need to
+compile PHP itself from source, which is outside what this repo covers.
 
 ## Deploying to real AWS Lambda
 
