@@ -94,6 +94,9 @@ RUN dnf install -y \
 COPY --from=mongodb-builder /usr/lib64/php${PHP_VERSION}/modules/mongodb.so /usr/lib64/php${PHP_VERSION}/modules/mongodb.so
 RUN echo "extension=mongodb" > /etc/php.d/30-mongodb.ini
 
+# Let Lambda's own memory limit be the only ceiling, not PHP's.
+RUN echo "memory_limit = -1" > /etc/php.d/99-memory-limit.ini
+
 WORKDIR /var/task
 
 COPY --from=composer-builder /var/task /var/task

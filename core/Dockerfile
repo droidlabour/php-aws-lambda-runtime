@@ -23,6 +23,9 @@ RUN dnf install -y \
     --setopt=install_weak_deps=0 \
     && dnf clean all
 
+# Let Lambda's own memory limit be the only ceiling, not PHP's.
+RUN echo "memory_limit = -1" > /etc/php.d/99-memory-limit.ini
+
 WORKDIR /var/task
 
 COPY bootstrap /var/runtime/
