@@ -3,7 +3,7 @@
 A minimal custom PHP runtime for AWS Lambda container images — no Bref,
 no vendor-provided extension layers, just AWS's own `provided:al2023` base
 image, PHP installed straight from Amazon Linux 2023's package repo, and a
-~40-line runtime loop.
+~60-line runtime loop.
 
 ## Why
 
@@ -40,10 +40,15 @@ sequenceDiagram
     Boot->>Handler: require file.php (once, cold start)
     loop for the life of the container
         Boot->>API: GET /invocation/next (blocks until an event arrives)
-        API-->>Boot: event JSON + request ID
+        API-->>Boot: event JSON + request/trace/invocation IDs
         Boot->>Handler: handler(event)
-        Handler-->>Boot: return array
-        Boot->>API: POST /invocation/{id}/response
+        alt handler returns
+            Handler-->>Boot: return array
+            Boot->>API: POST /invocation/{id}/response
+        else handler throws
+            Handler-->>Boot: Throwable
+            Boot->>API: POST /invocation/{id}/error
+        end
     end
 ```
 
@@ -64,6 +69,24 @@ So `CMD ["example.handler"]` loads `example.php` and calls `handler()` in
 it. Because the split is on the first dot, your handler *file* name can't
 itself contain a dot — `handler.example.php` would parse as file
 `handler`, function `example.php`, which breaks. Keep the filename plain.
+
+### What each invocation does beyond calling your handler
+
+Every `GET /invocation/next` response carries a few headers the loop acts
+on before it calls your handler:
+
+- **`Lambda-Runtime-Trace-Id`** is copied into the `_X_AMZN_TRACE_ID`
+  environment variable (and cleared when the header is absent). The AWS
+  SDK and the X-Ray SDK read that variable, so this is what lets traces
+  from inside your handler attach to the right request.
+- **`Lambda-Runtime-Invocation-Id`**, when present, is sent straight back
+  as a header on the `/response` and `/error` POSTs. Lambda uses it to
+  confirm the runtime is answering the invocation it was actually handed.
+
+If your handler throws, the loop catches it and POSTs to
+`/invocation/{id}/error` instead — a JSON body with `errorMessage`,
+`errorType`, and `stackTrace` (`$e->getTrace()`) — so the failure shows
+up in Lambda's own metrics and logs rather than hanging the invocation.
 
 ## Repo layout
 

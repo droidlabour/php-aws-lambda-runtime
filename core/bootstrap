@@ -20,23 +20,43 @@ while (true) {
     preg_match('/^Lambda-Runtime-Aws-Request-Id:\s*(.*)$/mi', $headers, $matches);
     $requestId = trim($matches[1]);
 
+    // Echo this back on the response/error so Lambda can tell we are answering
+    // the invocation we were actually handed (cross-wiring protection).
+    $invocationId = null;
+    if (preg_match('/^Lambda-Runtime-Invocation-Id:\s*(.*)$/mi', $headers, $invocationMatches)) {
+        $invocationId = trim($invocationMatches[1]);
+    }
+
+    if (preg_match('/^Lambda-Runtime-Trace-Id:\s*(.*)$/mi', $headers, $traceMatches)) {
+        putenv('_X_AMZN_TRACE_ID=' . trim($traceMatches[1]));
+    } else {
+        putenv('_X_AMZN_TRACE_ID');
+    }
+
     try {
         $result = call_user_func($handlerFunction, json_decode($body, true));
 
         $ch = curl_init("http://{$runtimeApi}/2018-06-01/runtime/invocation/{$requestId}/response");
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($result));
+        if ($invocationId !== null) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Lambda-Runtime-Invocation-Id: {$invocationId}"]);
+        }
         curl_exec($ch);
         curl_close($ch);
     } catch (\Throwable $e) {
         $errorBody = json_encode([
             'errorMessage' => $e->getMessage(),
             'errorType' => get_class($e),
+            'stackTrace' => $e->getTrace(),
         ]);
 
         $ch = curl_init("http://{$runtimeApi}/2018-06-01/runtime/invocation/{$requestId}/error");
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $errorBody);
+        if ($invocationId !== null) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Lambda-Runtime-Invocation-Id: {$invocationId}"]);
+        }
         curl_exec($ch);
         curl_close($ch);
     }
