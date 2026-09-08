@@ -72,6 +72,24 @@ message gets redelivered — not the whole batch.
   `Illuminate\Queue\Jobs\Job` class directly, whose default
   `delete()`/`release()` are harmless no-ops, and reports failures back to
   Lambda via `batchItemFailures` instead of calling the SQS API itself.
+- **`queue.php` returns a plain array, not a JSON string.** `bootstrap`
+  already runs `json_encode()` on whatever the handler returns (same as
+  `http.php`). If `queue.php` returned `json_encode(['batchItemFailures'
+  => ...])` itself, the value would be encoded twice and Lambda would get
+  the string `"{\"batchItemFailures\":[]}"` instead of an object. The SQS
+  event source mapping can't read the `batchItemFailures` key out of a
+  string, so it treats every batch as a total failure — nothing gets
+  deleted, everything is redelivered until `maxReceiveCount`, and healthy
+  messages pile into the DLQ. Return the array; let `bootstrap` encode it
+  once.
+- **The `Job-Started` / `Job-Finished` / `Job-Failed` log lines are an
+  observability example, not required plumbing.** `queueJobLogContext()`
+  writes one JSON line per job with its name, id, and attempt count.
+  `queueJobIdProperties()` reflects on the deserialized job command and
+  adds any property whose name ends in `id` (e.g. `orderId`,
+  `customerId`), so the logs carry the job's own identifiers without this
+  file needing to know any specific job class. Drop both helpers if you
+  don't want the noise — the handler works the same without them.
 - **No dead-letter queue means no escape hatch.** If a job's failure
   condition never resolves, `batchItemFailures` will keep telling SQS to
   redeliver it — forever, unless the source SQS queue has a
