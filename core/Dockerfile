@@ -20,11 +20,22 @@ ARG PHP_VERSION=8.5
 RUN dnf install -y \
     php${PHP_VERSION} \
     php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-opcache \
     --setopt=install_weak_deps=0 \
     && dnf clean all
 
 # Let Lambda's own memory limit be the only ceiling, not PHP's.
 RUN echo "memory_limit = -1" > /etc/php.d/99-memory-limit.ini
+
+# bootstrap runs your app as a long-lived PHP CLI process, so opcache has to
+# be turned on for CLI explicitly - it's off by default there. The code is
+# baked into the image and never changes at runtime, so skip the file-time
+# checks too.
+RUN printf '%s\n' \
+    'opcache.enable=1' \
+    'opcache.enable_cli=1' \
+    'opcache.validate_timestamps=0' \
+    > /etc/php.d/50-opcache.ini
 
 WORKDIR /var/task
 

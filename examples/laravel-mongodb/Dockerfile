@@ -83,6 +83,7 @@ ENV TZ=UTC
 RUN dnf install -y \
     php${PHP_VERSION} \
     php${PHP_VERSION}-cli \
+    php${PHP_VERSION}-opcache \
     php${PHP_VERSION}-mbstring \
     php${PHP_VERSION}-gd \
     php${PHP_VERSION}-xml \
@@ -96,6 +97,20 @@ RUN echo "extension=mongodb" > /etc/php.d/30-mongodb.ini
 
 # Let Lambda's own memory limit be the only ceiling, not PHP's.
 RUN echo "memory_limit = -1" > /etc/php.d/99-memory-limit.ini
+
+# bootstrap runs the app as a long-lived PHP CLI process, so opcache has to
+# be turned on for CLI explicitly - it's off by default there. The code is
+# baked into the image and never changes at runtime, so skip the file-time
+# checks too. Bigger buffers than core/Dockerfile's because Laravel plus
+# vendor is thousands of files with a lot of repeated class/method names.
+RUN printf '%s\n' \
+    'opcache.enable=1' \
+    'opcache.enable_cli=1' \
+    'opcache.validate_timestamps=0' \
+    'opcache.memory_consumption=192' \
+    'opcache.interned_strings_buffer=32' \
+    'opcache.max_accelerated_files=20000' \
+    > /etc/php.d/50-opcache.ini
 
 WORKDIR /var/task
 
