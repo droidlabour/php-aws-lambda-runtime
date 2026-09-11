@@ -1,9 +1,11 @@
 <?php
 
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
 require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/reset.php';
 
 $app = require __DIR__ . '/bootstrap/app.php';
 
@@ -11,6 +13,15 @@ function handler(array $event): array
 {
     global $app;
 
+    try {
+        return handleRequest($app, $event);
+    } finally {
+        lambda_flush_state($app);
+    }
+}
+
+function handleRequest(Application $app, array $event): array
+{
     $method = $event['requestContext']['http']['method'] ?? 'GET';
     $uri = $event['rawPath'] ?? '/';
     if (!empty($event['rawQueryString'])) {

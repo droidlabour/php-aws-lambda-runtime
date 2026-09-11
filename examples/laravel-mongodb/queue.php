@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 
 require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/LambdaSqsJob.php';
+require __DIR__ . '/reset.php';
 
 $app = require __DIR__ . '/bootstrap/app.php';
 $app->make(ConsoleKernel::class)->bootstrap();
@@ -90,6 +91,11 @@ function handler(array $event): array
             report($e);
             $handler->failed($payload['data'], $e, $payload['uuid'] ?? $record['messageId']);
             $failures[] = ['itemIdentifier' => $record['messageId']];
+        } finally {
+            // The warm container reuses one booted app across invocations
+            // and across every record in this batch. Clear per-job state so
+            // it does not leak into the next job.
+            lambda_flush_state($app);
         }
     }
 

@@ -90,6 +90,15 @@ message gets redelivered — not the whole batch.
   `customerId`), so the logs carry the job's own identifiers without this
   file needing to know any specific job class. Drop both helpers if you
   don't want the noise — the handler works the same without them.
+- **`reset.php`'s `lambda_flush_state()` runs after every request and every
+  queue record.** The warm container keeps one booted Laravel application
+  alive for as long as it lives, so anything a request or job writes to
+  shared or scoped state (the query log, shared log context, Sentry
+  breadcrumbs if you use `sentry/sentry-laravel`) would otherwise carry over
+  into the next one on that same container — memory that only grows, and
+  occasionally state from one request leaking into the next. It's a small,
+  hand-picked subset of what Laravel Octane resets between requests, not a
+  full re-bootstrap.
 - **No dead-letter queue means no escape hatch.** If a job's failure
   condition never resolves, `batchItemFailures` will keep telling SQS to
   redeliver it — forever, unless the source SQS queue has a

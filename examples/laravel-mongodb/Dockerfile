@@ -120,6 +120,7 @@ COPY aws-lambda/bootstrap /var/runtime/
 COPY aws-lambda/http.php .
 COPY aws-lambda/queue.php .
 COPY aws-lambda/LambdaSqsJob.php .
+COPY aws-lambda/reset.php .
 
 # Default to the HTTP handler; override `command:` per Lambda function to
 # point at queue.handler for the SQS-triggered one - see the README.

@@ -108,6 +108,7 @@ examples/laravel-mongodb/  a real, working example: Laravel HTTP + SQS queue
   http.php                 bridges API Gateway/Function URL events into Laravel's HTTP kernel
   queue.php                bridges SQS events into Laravel's queue job pipeline
   LambdaSqsJob.php          minimal Job implementation for the queue bridge
+  reset.php                 clears per-invocation Laravel state on the warm container between requests/jobs
   invoke-http.sh            local HTTP invoke helper
   invoke-sqs.sh             local SQS invoke helper
   make-test-job.php         dev helper: generates a real serialized job payload for testing
