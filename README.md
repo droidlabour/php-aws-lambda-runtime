@@ -82,6 +82,11 @@ on before it calls your handler:
 - **`Lambda-Runtime-Invocation-Id`**, when present, is sent straight back
   as a header on the `/response` and `/error` POSTs. Lambda uses it to
   confirm the runtime is answering the invocation it was actually handed.
+- **`Lambda-Runtime-Aws-Request-Id`** is put into an `AWS_LAMBDA_REQUEST_ID`
+  environment variable your handler can read. A custom runtime doesn't get
+  the per-request context object the managed runtimes hand you, so this is
+  the only place that id exists — useful for tagging log lines so you can
+  pull one invocation's output back out of CloudWatch.
 
 If your handler throws, the loop catches it and POSTs to
 `/invocation/{id}/error` instead — a JSON body with `errorMessage`,

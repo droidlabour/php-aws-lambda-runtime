@@ -20,6 +20,13 @@ while (true) {
     preg_match('/^Lambda-Runtime-Aws-Request-Id:\s*(.*)$/mi', $headers, $matches);
     $requestId = trim($matches[1]);
 
+    // Expose the invocation's request id to the app. A custom runtime does
+    // not get the per-request context object the managed runtimes hand your
+    // handler, so this is the only place it exists - useful for tagging log
+    // lines so you can pull one invocation's output back out of CloudWatch.
+    putenv("AWS_LAMBDA_REQUEST_ID={$requestId}");
+    $_SERVER['AWS_LAMBDA_REQUEST_ID'] = $requestId;
+
     // Echo this back on the response/error so Lambda can tell we are answering
     // the invocation we were actually handed (cross-wiring protection).
     $invocationId = null;
